@@ -5,7 +5,7 @@ module Eviterra
         methods.each do |m|
           class_eval %{def #{m}_with_instrumentation(*args, &block)
             # Rails.logger.debug "#{name}##{m} instrumentation"
-            ActiveSupport::Notifications.instrumenter.instrument "eviterra.http", :name => "#{m}" do
+            ActiveSupport::Notifications.instrumenter.instrument "http.eviterra", :name => "#{m}" do
               #{m}_without_instrumentation(*args, &block)
             end
           end
@@ -74,13 +74,12 @@ module Eviterra
       end
 
       def self.reset_runtime
-        # Rails.logger.debug "reset_runtime"
         rt, self.runtime = runtime, 0
         rt
       end
 
-      def eviterra(event)
-        # Rails.logger.debug "eviterra"
+      def http(event)
+        debug color(:green, 'HTTP (%fms)' % event.duration)
         self.class.runtime += event.duration
       end
     end
