@@ -3,9 +3,9 @@ module Eviterra
     def self.instrument(clazz, *methods)
       clazz.module_eval do
         methods.each do |m|
+          namespace = clazz.name.underscore.gsub('/', '_')
           class_eval %{def #{m}_with_instrumentation(*args, &block)
-            # Rails.logger.debug "#{name}##{m} instrumentation"
-            ActiveSupport::Notifications.instrumenter.instrument "http.eviterra", :name => "#{m}" do
+            ActiveSupport::Notifications.instrumenter.instrument "http.#{namespace}", :name => "#{m}", :class => "#{clazz}" do
               #{m}_without_instrumentation(*args, &block)
             end
           end
@@ -24,12 +24,13 @@ module Eviterra
         Eviterra::Instrumentation.instrument Typhoeus::Hydra, :run
 
         ActiveSupport.on_load(:action_controller) do
-          # Rails.logger.debug "controller instrumentation"
           include Eviterra::Instrumentation::ControllerRuntime
         end
 
-        Eviterra::Instrumentation::LogSubscriber.attach_to :http
-        # Rails.logger.debug "instrumentation"
+        Eviterra::Instrumentation::LogSubscriber.attach_to :curl_easy
+        Eviterra::Instrumentation::LogSubscriber.attach_to :curl_multi
+        Eviterra::Instrumentation::LogSubscriber.attach_to :net_http
+        Eviterra::Instrumentation::LogSubscriber.attach_to :typhoeus_hydra
       end
     end
 
@@ -79,7 +80,7 @@ module Eviterra
       end
 
       def http(event)
-        debug color(:green, 'HTTP (%fms)' % event.duration)
+        debug color("HTTP #{event.payload[:class]}##{event.payload[:name]} (%.1fms)" % event.duration, GREEN)
         self.class.runtime += event.duration
       end
     end
